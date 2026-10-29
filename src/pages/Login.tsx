@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { LogoMark } from '@/components/Logo'
 import { Button, ErrorNote, Input, cx } from '@/components/ui'
 import { supabaseConfigured } from '@/lib/supabase'
+import { DEMO, DEMO_DRIVER_PHONE } from '@/lib/demo'
 
 type Mode = 'owner' | 'driver'
 
@@ -114,6 +115,11 @@ export default function Login() {
           <p className="mt-4 text-center text-xs text-slate-400">
             {mode === 'driver' ? 'Your login is set up by the vehicle owner.' : 'Owner access to all vehicles.'}
           </p>
+          {DEMO && (
+            <p className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-center text-xs text-brand-700 ring-1 ring-brand-100">
+              Demo mode with sample data. {mode === 'owner' ? 'Any email and password works.' : `Try ${DEMO_DRIVER_PHONE} with any password.`}
+            </p>
+          )}
         </div>
       </div>
     </div>

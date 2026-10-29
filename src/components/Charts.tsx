@@ -67,8 +67,8 @@ export function TimeDonut({ moving, idle, stopped }: { moving: number; idle: num
     { name: 'Stopped', value: stopped, color: STATE_META.stopped.color },
   ]
   return (
-    <div className="flex items-center gap-5">
-      <div className="relative size-36 shrink-0">
+    <div className="flex items-center gap-4">
+      <div className="relative size-32 shrink-0">
         <ResponsiveContainer>
           <PieChart>
             <Pie data={data} dataKey="value" innerRadius="70%" outerRadius="100%" strokeWidth={2} startAngle={90} endAngle={-270}>
@@ -87,8 +87,8 @@ export function TimeDonut({ moving, idle, stopped }: { moving: number; idle: num
         {data.map((d) => (
           <li key={d.name} className="flex items-center gap-2">
             <span className="size-2.5 rounded-full" style={{ background: d.color }} />
-            <span className="w-16 text-slate-500">{d.name}</span>
-            <span className="font-semibold">{hours(d.value)}</span>
+            <span className="w-14 text-slate-500">{d.name}</span>
+            <span className="font-semibold whitespace-nowrap">{hours(d.value)}</span>
           </li>
         ))}
       </ul>

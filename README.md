@@ -27,6 +27,34 @@ Phone / browser ──► Supabase Auth + Postgres (profiles, vehicles, RLS)
 The OneLap login is stored only as a Supabase secret and is used server-side. Owners can query every
 vehicle in their fleet; drivers can query only their assigned vehicle (checked on the server).
 
+## Try it on your computer
+
+You need [Node.js 20+](https://nodejs.org) and Git.
+
+```bash
+git clone https://github.com/Tamilkesavan/velavan-transport.git
+cd velavan-transport
+npm install
+```
+
+**Demo mode** (sample data, nothing else to set up):
+
+```bash
+npm run demo
+```
+
+Open http://localhost:5173. Owner tab: any email and password. Driver tab: `9876543210` with any password.
+Drivers you add in demo mode are kept until you reload the page.
+
+**With your real data** (after steps 1–3 of the one-time setup below, no hosting needed):
+
+```bash
+cp .env.production .env.local
+npm run dev
+```
+
+Open http://localhost:5173 and sign in with your owner account.
+
 ## One-time setup
 
 1. **Supabase secrets** (Dashboard → Edge Functions → Secrets):
@@ -43,14 +71,6 @@ vehicle in their fleet; drivers can query only their assigned vehicle (checked o
 4. **Hosting**: import this repo at https://vercel.com/new (framework: Vite). No settings needed;
    the public Supabase URL and anon key are in `.env.production`.
 5. Sign in as owner → **Vehicles** → **Import from OneLap** → **Drivers** → **Add driver**.
-
-## Development
-
-```bash
-npm install
-cp .env.example .env.local   # fill in the anon key
-npm run dev
-```
 
 ## Notes on the numbers
 

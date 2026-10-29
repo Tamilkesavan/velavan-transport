@@ -91,16 +91,19 @@ export function Field({ label, children, hint, className }: { label: string; chi
   )
 }
 
-const control = 'block w-full rounded-lg border-0 bg-white px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-brand-500 focus:outline-none'
+const control = 'block rounded-lg border-0 bg-white px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-brand-500 focus:outline-none'
+
+// Full width unless the caller sets its own width
+const width = (className?: string) => (/(^|\s)w-/.test(className ?? '') ? '' : 'w-full')
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...p }, ref) {
-  return <input ref={ref} {...p} className={cx(control, className)} />
+  return <input ref={ref} {...p} className={cx(control, width(className), className)} />
 })
 export function Select({ className, ...p }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...p} className={cx(control, 'pr-8', className)} />
+  return <select {...p} className={cx(control, width(className), 'pr-8', className)} />
 }
 export function Textarea({ className, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea rows={2} {...p} className={cx(control, className)} />
+  return <textarea rows={2} {...p} className={cx(control, width(className), className)} />
 }
 
 export function Modal({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode }) {
