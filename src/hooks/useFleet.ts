@@ -22,8 +22,10 @@ export function useVehicles() {
   return { vehicles, loading, error, reload }
 }
 
-/** Latest position of each vehicle, refreshed every `intervalMs`. */
-export function useLivePositions(vehicles: Vehicle[], intervalMs = 15000) {
+export const LIVE_INTERVAL_MS = 10000
+
+/** Latest position of each vehicle from OneLap, refreshed every 10 seconds. */
+export function useLivePositions(vehicles: Vehicle[], intervalMs = LIVE_INTERVAL_MS) {
   const [positions, setPositions] = useState<Record<number, Position | null>>({})
   const [errors, setErrors] = useState<Record<number, string>>({})
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)

@@ -16,8 +16,8 @@ export default defineConfig({
         name: 'Velavan Transport',
         short_name: 'Velavan',
         description: 'Fleet tracking and expenses for Velavan Transport',
-        theme_color: '#0b1220',
-        background_color: '#0b1220',
+        theme_color: '#060a13',
+        background_color: '#060a13',
         display: 'standalone',
         start_url: '/',
         icons: [
@@ -30,7 +30,7 @@ export default defineConfig({
         navigateFallback: '/index.html',
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/[abc]\.tile\.openstreetmap\.org\/.*/,
+            urlPattern: /^https:\/\/([abcd]\.basemaps\.cartocdn\.com|server\.arcgisonline\.com)\/.*/,
             handler: 'CacheFirst',
             options: { cacheName: 'map-tiles', expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 14 } },
           },

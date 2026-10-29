@@ -119,13 +119,14 @@ function computeDay(points: Position[], windowS: number) {
     if (kmh(prev.speed) >= MOVING_KMH) moving += dt
     else if (ignition(prev)) idle += dt
   }
-  // Prefer the device odometer (metres) when it is present and sane.
+  // Prefer the device's own distance over GPS geometry: first the odometer delta
+  // (totalDistance, metres), then the sum of per-point distances, else the haversine sum above.
   const first = points[0]?.attributes?.totalDistance
   const last = points.at(-1)?.attributes?.totalDistance
-  if (typeof first === 'number' && typeof last === 'number') {
-    const odoKm = (last - first) / 1000
-    if (odoKm >= 0 && odoKm < 1500) km = odoKm
-  }
+  const perPoint = points.slice(1).reduce((a, p) => a + (typeof p.attributes?.distance === 'number' ? (p.attributes.distance as number) : 0), 0) / 1000
+  const odoKm = typeof first === 'number' && typeof last === 'number' ? (last - first) / 1000 : NaN
+  if (odoKm > 0 && odoKm < 1500) km = odoKm
+  else if (perPoint > 0 && perPoint < 1500) km = perPoint
   moving = Math.min(moving, windowS)
   idle = Math.min(idle, windowS - moving)
   return {

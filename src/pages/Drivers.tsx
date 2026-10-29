@@ -61,16 +61,16 @@ export default function Drivers() {
           <Table head={['Driver', 'Mobile (login)', 'Assigned vehicle', 'Status', '']}>
             {drivers.map((d) => (
               <tr key={d.id}>
-                <td className="px-4 py-3 font-semibold">{d.name}</td>
-                <td className="px-4 py-3 text-slate-600">{d.phone}</td>
-                <td className="px-4 py-3">{vehicleName(d.vehicle_id) ? <span className="font-semibold tracking-wide">{vehicleName(d.vehicle_id)}</span> : <span className="text-slate-400">Not assigned</span>}</td>
-                <td className="px-4 py-3">{d.active ? <Badge tone="green">Active</Badge> : <Badge>Disabled</Badge>}</td>
+                <td className="px-4 py-3 font-semibold text-white">{d.name}</td>
+                <td className="px-4 py-3 text-slate-400">{d.phone}</td>
+                <td className="px-4 py-3">{vehicleName(d.vehicle_id) ? <span className="font-semibold tracking-wide text-white">{vehicleName(d.vehicle_id)}</span> : <span className="text-slate-500">Not assigned</span>}</td>
+                <td className="px-4 py-3">{d.active ? <Badge tone="green" dot="#34d399">Active</Badge> : <Badge>Disabled</Badge>}</td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">
                   <Button variant="ghost" onClick={() => setEditing(d)} aria-label="Edit">
                     <Pencil className="size-4" />
                   </Button>
                   <Button variant="ghost" onClick={() => remove(d)} aria-label="Delete">
-                    <Trash2 className="size-4 text-red-500" />
+                    <Trash2 className="size-4 text-red-400" />
                   </Button>
                 </td>
               </tr>

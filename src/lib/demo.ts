@@ -21,74 +21,183 @@ const profiles: Profile[] = [
   { id: 'drv-2', role: 'driver', name: 'Selvam', phone: '9123456780', owner_id: OWNER.id, vehicle_id: 'veh-7681', active: true, created_at: '' },
 ]
 
-// Namakkal -> Salem -> Erode loop for the moving truck
-const ROUTE: [number, number][] = [
-  [11.219, 78.167], [11.33, 78.12], [11.45, 78.13], [11.56, 78.14], [11.664, 78.146],
-  [11.6, 77.95], [11.45, 77.8], [11.34, 77.717], [11.28, 77.9], [11.219, 78.167],
-]
-const PARKED: Record<number, { at: [number, number]; ignition: boolean; ageMin: number }> = {
-  7681: { at: [11.664, 78.146], ignition: true, ageMin: 1 },
-  3565: { at: [10.79, 78.704], ignition: false, ageMin: 25 },
+// Each lorry runs its own loop out of Namakkal. Coordinates are real towns on those roads.
+const ROUTES: Record<number, [number, number][]> = {
+  4950: [[11.219, 78.167], [11.33, 78.12], [11.45, 78.13], [11.664, 78.146], [11.6, 77.95], [11.45, 77.8], [11.34, 77.717], [11.28, 77.9], [11.219, 78.167]], // Salem, Erode
+  7681: [[11.219, 78.167], [11.1, 78.0], [11.06, 77.75], [11.017, 76.956], [11.06, 77.35], [11.15, 77.9], [11.219, 78.167]], // Tiruppur, Coimbatore
+  3565: [[11.219, 78.167], [11.08, 78.35], [10.95, 78.55], [10.79, 78.704], [10.95, 78.45], [11.219, 78.167]], // Tiruchirappalli
 }
+const ODO_START: Record<number, number> = { 4950: 182_340, 7681: 241_115, 3565: 96_870 }
 
-/** Deterministic pseudo-random number from a string, so charts don't jump on reload. */
+/** Deterministic pseudo-random number from a string, so figures are stable across reloads. */
 function rand(seed: string) {
   let h = 2166136261
   for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619)
   return ((h >>> 0) % 10000) / 10000
 }
 
-function alongRoute(f: number) {
-  const seg = (ROUTE.length - 1) * (f % 1)
-  const i = Math.floor(seg)
-  const t = seg - i
-  const [a, b] = [ROUTE[i], ROUTE[i + 1]]
-  const course = (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI
+function km(a: [number, number], b: [number, number]) {
+  const rad = (d: number) => (d * Math.PI) / 180
+  const dLat = rad(b[0] - a[0])
+  const dLng = rad(b[1] - a[1])
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a[0])) * Math.cos(rad(b[0])) * Math.sin(dLng / 2) ** 2
+  return 2 * 6371 * Math.asin(Math.sqrt(h))
+}
+
+/** Point at fraction f of the route's length (by distance, so speed stays even across legs). */
+function pointOnRoute(route: [number, number][], f: number) {
+  const legs = route.slice(1).map((pt, i) => km(route[i], pt))
+  let target = legs.reduce((a, b) => a + b, 0) * Math.min(0.9999, Math.max(0, f))
+  let i = 0
+  while (i < legs.length - 1 && target > legs[i]) target -= legs[i++]
+  const t = legs[i] ? target / legs[i] : 0
+  const [a, b] = [route[i], route[i + 1]]
+  const course = ((Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI + 360) % 360
   return { lat: a[0] + (b[0] - a[0]) * t, lng: a[1] + (b[1] - a[1]) * t, course }
+}
+
+const dayCache = new Map<string, Position[]>()
+
+/**
+ * One simulated working day for a lorry: leaves 5–7 am, a tea stop and a lunch stop with the
+ * engine idling, an unloading stop with the engine off. Points every 2 minutes, like a OneLap
+ * mini-route, and the reported speed always matches the distance between points.
+ * Monthly figures and route replay are both computed from these same points.
+ */
+function dayPoints(deviceId: number, day: string): Position[] {
+  const key = `${deviceId}:${day}`
+  const hit = dayCache.get(key)
+  if (hit) return hit
+  const r = rand(key)
+  const out: Position[] = []
+  if (r >= 0.1) {
+    const route = ROUTES[deviceId] ?? ROUTES[4950]
+    const loopKm = route.slice(1).reduce((a, pt, i) => a + km(route[i], pt), 0)
+    const reach = 1.1 + rand(`reach${key}`) * 0.9 // loops covered that day (1.1–2)
+    const avgKmh = 38 + rand(`v${key}`) * 10
+    const driveMin = Math.round(((loopKm * reach) / avgKmh) * 60)
+    const stops = [
+      { at: 0.25, min: 20, ignition: true }, // tea, engine idling
+      { at: 0.55, min: 45, ignition: true }, // lunch, engine idling
+      { at: 0.8, min: 16, ignition: false }, // unloading, engine off
+    ]
+    const startMin = (deviceId === 7681 ? 600 : 300) + Math.round(r * 120) // leaves 5–7 am (7681: 10 am–noon)
+    const base = new Date(`${day}T00:00:00`).getTime()
+    let odo = (ODO_START[deviceId] ?? 100_000) * 1000 + (new Date(day).getTime() / 86400000 - 20_000) * 165_000
+    let driven = 0 // minutes of driving done
+    let clock = 0 // minutes since leaving
+    let prev = pointOnRoute(route, 0)
+    let stopIdx = 0
+    let stopLeft = 0
+    while (driven < driveMin) {
+      let kmh = 0
+      let ignition = true
+      if (stopLeft > 0) {
+        stopLeft -= 2
+        ignition = stops[stopIdx - 1].ignition
+      } else if (stopIdx < stops.length && driven / driveMin >= stops[stopIdx].at) {
+        stopLeft = stops[stopIdx].min - 2
+        ignition = stops[stopIdx].ignition
+        stopIdx++
+      } else {
+        driven += 2
+        const p = pointOnRoute(route, ((driven / driveMin) * reach) % 1)
+        const stepKm = km([prev.lat, prev.lng], [p.lat, p.lng])
+        odo += stepKm * 1000
+        kmh = stepKm * 30 * (0.9 + rand(`${key}${clock}`) * 0.2) // speed matches distance covered
+        prev = p
+      }
+      clock += 2
+      out.push({
+        id: base + clock,
+        deviceId,
+        latitude: prev.lat,
+        longitude: prev.lng,
+        speed: kmh / 1.852,
+        speedKmh: Math.round(kmh),
+        ignition,
+        course: prev.course,
+        fixTime: new Date(base + (startMin + clock) * 60000).toISOString(),
+        attributes: { totalDistance: odo, battery: 5, gsm: 4 },
+      })
+    }
+  }
+  dayCache.set(key, out)
+  return out
+}
+
+function localDay(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function latest(deviceId: number): Position {
   const now = Date.now()
-  const base = { id: now, deviceId, attributes: { battery: 5, gsm: 4, totalDistance: (182345 + deviceId) * 1000 } }
-  const parked = PARKED[deviceId]
-  if (parked) {
-    return { ...base, latitude: parked.at[0], longitude: parked.at[1], speed: 0, speedKmh: 0, ignition: parked.ignition, course: 0, fixTime: new Date(now - parked.ageMin * 60000).toISOString() }
+  const today = dayPoints(deviceId, localDay(new Date()))
+  const done = today.filter((p) => new Date(p.fixTime!).getTime() <= now)
+  if (done.length && done.length < today.length) {
+    // On the road: interpolate between the 2-minute points so the marker glides every 10 s.
+    const a = done.at(-1)!
+    const b = today[done.length]
+    const k = (now - new Date(a.fixTime!).getTime()) / 120000
+    return { ...a, latitude: a.latitude + (b.latitude - a.latitude) * k, longitude: a.longitude + (b.longitude - a.longitude) * k, fixTime: new Date(now - 4000).toISOString() }
   }
-  const p = alongRoute(now / (40 * 60 * 1000)) // one loop every 40 minutes
-  const kmh = 48 + Math.round(Math.sin(now / 20000) * 8)
-  return { ...base, latitude: p.lat, longitude: p.lng, speed: kmh / 1.852, speedKmh: kmh, ignition: true, course: p.course, fixTime: new Date(now - 20000).toISOString() }
+  const last = done.at(-1) ?? dayPoints(deviceId, localDay(new Date(now - 86400000))).at(-1)
+  const home = ROUTES[deviceId]?.[0] ?? [11.219, 78.167]
+  return {
+    id: now,
+    deviceId,
+    latitude: last?.latitude ?? home[0],
+    longitude: last?.longitude ?? home[1],
+    speed: 0,
+    speedKmh: 0,
+    ignition: false,
+    course: last?.course ?? 0,
+    // parked devices still send a heartbeat every few minutes
+    fixTime: new Date(now - 3 * 60000).toISOString(),
+    attributes: { totalDistance: last?.attributes?.totalDistance, battery: 5, gsm: 3 },
+  }
 }
 
 function history(deviceId: number, from: Date, to: Date): Position[] {
-  const start = Math.max(from.getTime(), new Date(from).setHours(6, 0, 0, 0))
-  const end = Math.min(to.getTime(), new Date(from).setHours(19, 0, 0, 0))
   const out: Position[] = []
-  for (let t = start, i = 0; t <= end; t += 2 * 60000, i++) {
-    const f = (t - start) / (end - start || 1)
-    const p = alongRoute(f * 0.999)
-    const lunch = f > 0.45 && f < 0.52
-    const kmh = lunch ? 0 : Math.max(0, 45 + Math.sin(i / 3) * 18 + (rand(`${deviceId}${i}`) - 0.5) * 10)
-    out.push({ id: i, deviceId, latitude: p.lat, longitude: p.lng, speed: kmh / 1.852, speedKmh: Math.round(kmh), ignition: true, course: p.course, fixTime: new Date(t).toISOString(), attributes: { totalDistance: (180000 + f * 260) * 1000 } })
+  for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) out.push(...dayPoints(deviceId, localDay(d)))
+  return out.filter((p) => {
+    const t = new Date(p.fixTime!).getTime()
+    return t >= from.getTime() && t <= to.getTime()
+  })
+}
+
+/** Same rules as the onelap edge function: odometer km, moving >= 5 km/h, idle = ignition on. */
+function computeDay(points: Position[], windowS: number): Omit<DayStat, 'day'> {
+  let moving = 0
+  let idle = 0
+  let maxSpeed = 0
+  for (let i = 0; i < points.length; i++) {
+    maxSpeed = Math.max(maxSpeed, points[i].speedKmh)
+    if (!i) continue
+    const dt = (new Date(points[i].fixTime!).getTime() - new Date(points[i - 1].fixTime!).getTime()) / 1000
+    if (dt <= 0 || dt > 1200) continue
+    if (points[i - 1].speedKmh >= 5) moving += dt
+    else if (points[i - 1].ignition) idle += dt
   }
-  return out
+  const odo = points.length ? (points.at(-1)!.attributes!.totalDistance! - points[0].attributes!.totalDistance!) / 1000 : 0
+  return { km: Math.round(odo * 10) / 10, moving_s: Math.round(moving), idle_s: Math.round(idle), stopped_s: Math.max(0, Math.round(windowS - moving - idle)), max_speed: Math.round(maxSpeed) }
 }
 
 function summary(deviceId: number, from: string, to: string) {
   const days: DayStat[] = []
-  const today = new Date().toISOString().slice(0, 10)
-  for (let d = new Date(`${from}T00:00:00Z`); d <= new Date(`${(to > today ? today : to)}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + 1)) {
-    const day = d.toISOString().slice(0, 10)
-    const r = rand(`${deviceId}-${day}`)
-    const restDay = r < 0.12
-    const km = restDay ? 0 : Math.round(140 + r * 260 - (deviceId === 3565 ? 60 : 0))
-    const moving = Math.round((km / 42) * 3600)
-    const idle = restDay ? 0 : Math.round((0.6 + rand(`i${deviceId}${day}`) * 2.2) * 3600)
-    days.push({ day, km, moving_s: moving, idle_s: idle, stopped_s: 86400 - moving - idle, max_speed: restDay ? 0 : 62 + Math.round(r * 18) })
+  const today = localDay(new Date())
+  for (let d = new Date(`${from}T00:00:00`); localDay(d) <= (to > today ? today : to); d.setDate(d.getDate() + 1)) {
+    const day = localDay(d)
+    const start = new Date(`${day}T00:00:00`)
+    const until = day === today ? new Date() : new Date(start.getTime() + 86400000)
+    days.push({ day, ...computeDay(history(deviceId, start, until), (until.getTime() - start.getTime()) / 1000) })
   }
   const total = days.reduce(
     (t, r) => ({ km: t.km + r.km, moving_s: t.moving_s + r.moving_s, idle_s: t.idle_s + r.idle_s, stopped_s: t.stopped_s + r.stopped_s, max_speed: Math.max(t.max_speed, r.max_speed) }),
     { km: 0, moving_s: 0, idle_s: 0, stopped_s: 0, max_speed: 0 },
   )
+  total.km = Math.round(total.km * 10) / 10
   return { deviceId, from, to, days, total }
 }
 

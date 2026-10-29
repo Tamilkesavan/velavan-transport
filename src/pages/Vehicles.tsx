@@ -42,7 +42,7 @@ export default function Vehicles() {
       />
       <div className="mb-4 space-y-2">
         <ErrorNote error={error ?? syncError} />
-        {note && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 ring-1 ring-emerald-200">{note}</p>}
+        {note && <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300 ring-1 ring-emerald-500/25">{note}</p>}
       </div>
       <Card>
         {loading ? (
@@ -53,11 +53,11 @@ export default function Vehicles() {
           <Table head={['Registration', 'Name', 'OneLap device', '']}>
             {vehicles.map((v) => (
               <tr key={v.id}>
-                <td className="px-4 py-3 font-bold tracking-wide">
-                  <Link to={`/vehicles/${v.id}`} className="hover:text-brand-600">{v.reg_no}</Link>
+                <td className="px-4 py-3 font-bold tracking-wide text-white">
+                  <Link to={`/vehicles/${v.id}`} className="hover:text-brand-400">{v.reg_no}</Link>
                 </td>
-                <td className="px-4 py-3 text-slate-600">{v.name ?? '—'}</td>
-                <td className="px-4 py-3 text-slate-600">{v.onelap_device_id}</td>
+                <td className="px-4 py-3 text-slate-400">{v.name ?? '—'}</td>
+                <td className="px-4 py-3 text-slate-400">{v.onelap_device_id}</td>
                 <td className="px-4 py-3 text-right">
                   <Button variant="ghost" onClick={() => setEditing(v)} aria-label="Edit">
                     <Pencil className="size-4" />

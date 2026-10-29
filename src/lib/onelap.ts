@@ -48,8 +48,8 @@ export function vehicleState(p: Position | null | undefined): VehicleState {
 }
 
 export const STATE_META: Record<VehicleState, { label: string; color: string; tone: 'green' | 'amber' | 'red' | 'slate' }> = {
-  moving: { label: 'Moving', color: '#10b981', tone: 'green' },
-  idle: { label: 'Idle', color: '#f59e0b', tone: 'amber' },
-  stopped: { label: 'Stopped', color: '#64748b', tone: 'slate' },
-  offline: { label: 'Offline', color: '#cbd5e1', tone: 'slate' },
+  moving: { label: 'Moving', color: '#34d399', tone: 'green' },
+  idle: { label: 'Idle', color: '#fbbf24', tone: 'amber' },
+  stopped: { label: 'Stopped', color: '#f87171', tone: 'red' },
+  offline: { label: 'Offline', color: '#64748b', tone: 'slate' },
 }
