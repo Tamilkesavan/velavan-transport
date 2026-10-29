@@ -1,0 +1,7 @@
+project_id = "velavan-transport"
+
+[functions.onelap]
+verify_jwt = true
+
+[functions.drivers]
+verify_jwt = true
